@@ -13,6 +13,7 @@ import {
   closeDrizzleClient,
   getDrizzleClients,
   getDrizzleToken,
+  watchDrizzleClient,
 } from './common/drizzle.utils.js';
 import {
   DEFAULT_CONNECTION_NAME,
@@ -37,7 +38,16 @@ export class DrizzleCoreModule implements OnApplicationShutdown {
     private readonly options: DrizzleModuleOptions,
     @Inject(DRIZZLE_MODULE_DATABASE)
     private readonly db: unknown,
-  ) {}
+  ) {
+    for (const client of getDrizzleClients(this.db)) {
+      watchDrizzleClient(client, (error) =>
+        this.logger.error(
+          'Database connection error',
+          error instanceof Error ? error.stack : String(error),
+        ),
+      );
+    }
+  }
 
   static forRoot(options: DrizzleModuleOptions): DynamicModule {
     // Nest serializes dynamic module metadata to compute module keys when

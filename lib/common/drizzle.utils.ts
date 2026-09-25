@@ -20,6 +20,8 @@ type DrizzleClient = {
   end?: () => unknown;
   close?: () => unknown;
   promise?: () => DrizzleClient;
+  on?: (event: 'error', listener: (error: unknown) => void) => unknown;
+  listenerCount?: (event: 'error') => number;
 };
 type DrizzleDatabaseLike = {
   $client?: unknown;
@@ -28,6 +30,7 @@ type DrizzleDatabaseLike = {
 };
 
 const closedClients = new WeakSet<object>();
+const watchedClients = new WeakSet<object>();
 
 /**
  * Returns the driver clients a Drizzle database holds: `db.$client` and, for a
@@ -75,4 +78,35 @@ export async function closeDrizzleClient(client: DrizzleClient): Promise<void> {
   } else if (typeof target.close === 'function') {
     await target.close();
   }
+}
+
+/**
+ * Listens for the errors a driver client emits in the background, unless
+ * something already does: this module (e.g., because the same database is
+ * registered under several connection names) or the application, which then
+ * keeps full control over how they're handled. A node-postgres pool (and the
+ * Neon WebSocket pool built on it) emits `error` when the server drops an idle
+ * connection: a restart, a failover, a network partition. The pool has
+ * already discarded that connection and opens a fresh one for the next query;
+ * with no listener, Node raises the event as an uncaught exception and the
+ * process exits. A single node-postgres `Client` passed as `db` emits the same
+ * event, but can't reconnect: its queries fail from then on, so an application
+ * that relies on one should attach its own listener. Other clients either
+ * handle it themselves (mysql2 listens on each pooled connection, postgres.js
+ * reconnects) or are not event emitters (better-sqlite3, libSQL, PGlite, the
+ * HTTP drivers), so the listener is attached wherever `on()` exists and is
+ * inert elsewhere.
+ */
+export function watchDrizzleClient(
+  client: DrizzleClient,
+  onError: (error: unknown) => void,
+): void {
+  if (typeof client.on !== 'function' || watchedClients.has(client)) {
+    return;
+  }
+  watchedClients.add(client);
+  if ((client.listenerCount?.('error') ?? 0) > 0) {
+    return;
+  }
+  client.on('error', onError);
 }
