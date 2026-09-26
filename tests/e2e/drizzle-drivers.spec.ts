@@ -5,6 +5,7 @@ import { drizzle as libsql } from 'drizzle-orm/libsql';
 import { int as mysqlInt, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import { drizzle as mysql2 } from 'drizzle-orm/mysql2';
 import { drizzle as nodePostgres } from 'drizzle-orm/node-postgres';
+import { drizzle as pglite } from 'drizzle-orm/pglite';
 import { pgTable, serial, text as pgText } from 'drizzle-orm/pg-core';
 import { drizzle as postgresJs } from 'drizzle-orm/postgres-js';
 import {
@@ -69,6 +70,11 @@ const drivers: Record<string, Driver> = {
   'postgres.js': {
     register: () =>
       DrizzleModule.forRoot({ drizzle: postgresJs, connection: POSTGRES_URL }),
+    ...pg,
+  },
+  pglite: {
+    register: () =>
+      DrizzleModule.forRoot({ drizzle: pglite, connection: 'memory://' }),
     ...pg,
   },
   mysql2: {
