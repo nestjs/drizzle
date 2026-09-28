@@ -108,4 +108,29 @@ describe('Drizzle - client errors', () => {
       ),
     ).resolves.toBeDefined();
   });
+
+  it('should listen on clients of primary and replica databases', async () => {
+    const error = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const primaryClient = poolLikeClient();
+    const replicaClient = poolLikeClient();
+
+    await boot({
+      db: {
+        $client: primaryClient,
+        $primary: { $client: primaryClient },
+        $replicas: [{ $client: replicaClient }],
+      },
+    });
+
+    expect(primaryClient.listenerCount('error')).toBe(1);
+    expect(replicaClient.listenerCount('error')).toBe(1);
+
+    replicaClient.emit('error', new Error('replica connection dropped'));
+    expect(error).toHaveBeenCalledWith(
+      'Database connection error',
+      expect.stringContaining('replica connection dropped'),
+    );
+  });
 });
