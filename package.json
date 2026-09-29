@@ -48,7 +48,7 @@
     "drizzle-orm": "0.45.3",
     "husky": "9.1.7",
     "lint-staged": "17.6.0",
-    "mysql2": "3.24.4",
+    "mysql2": "3.24.5",
     "oxlint": "1.86.0",
     "pg": "8.23.0",
     "postgres": "3.4.9",
