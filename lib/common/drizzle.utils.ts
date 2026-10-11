@@ -23,6 +23,22 @@ type DrizzleClient = {
   on?: (event: 'error', listener: (error: unknown) => void) => unknown;
   listenerCount?: (event: 'error') => number;
 };
+type PooledConnection = {
+  on(event: 'error', listener: (error: unknown) => void): unknown;
+  removeListener(event: 'error', listener: (error: unknown) => void): unknown;
+  listenerCount(event: 'error'): number;
+};
+type NodePostgresPool = {
+  totalCount: number;
+  on(
+    event: 'acquire',
+    listener: (connection: PooledConnection) => void,
+  ): unknown;
+  on(
+    event: 'release',
+    listener: (error: unknown, connection: PooledConnection) => void,
+  ): unknown;
+};
 type DrizzleDatabaseLike = {
   $client?: unknown;
   $primary?: DrizzleDatabaseLike;
@@ -95,7 +111,9 @@ export async function closeDrizzleClient(client: DrizzleClient): Promise<void> {
  * handle it themselves (mysql2 listens on each pooled connection, postgres.js
  * reconnects) or are not event emitters (better-sqlite3, libSQL, PGlite, the
  * HTTP drivers), so the listener is attached wherever `on()` exists and is
- * inert elsewhere.
+ * inert elsewhere. A node-postgres pool's checked-out connections are watched
+ * as well, whether or not the application listens on the pool itself (see
+ * `watchCheckedOutConnections()`).
  */
 export function watchDrizzleClient(
   client: DrizzleClient,
@@ -105,8 +123,55 @@ export function watchDrizzleClient(
     return;
   }
   watchedClients.add(client);
+  if (isNodePostgresPool(client)) {
+    watchCheckedOutConnections(client, onError);
+  }
   if ((client.listenerCount?.('error') ?? 0) > 0) {
     return;
   }
   client.on('error', onError);
+}
+
+/**
+ * A node-postgres pool, or the Neon WebSocket pool built on it, recognized by
+ * the connection counter pg-pool exposes, so this module never loads `pg`.
+ * mysql2 pools have no `totalCount`.
+ */
+function isNodePostgresPool(
+  client: DrizzleClient,
+): client is DrizzleClient & NodePostgresPool {
+  return typeof (client as Partial<NodePostgresPool>).totalCount === 'number';
+}
+
+/**
+ * Listens for the errors of a node-postgres pool's connections while they're
+ * checked out. pg-pool listens on an idle connection itself, but removes that
+ * listener when it hands the connection out, and puts it back on release. A
+ * connection from `pool.connect()` therefore has no `error` listener while
+ * it's in use, and Drizzle's `transaction()` runs on one: a connection the
+ * server drops mid-transaction (a restart, a failover,
+ * `pg_terminate_backend()`) emits `error` on an object nobody listens to, and
+ * the process exits. The listener only keeps that event from becoming an
+ * uncaught exception: the query in flight rejects with the error either way.
+ * pg-pool emits `acquire` while its own idle listener is still attached, so a
+ * connection that already has another listener belongs to the application
+ * and is left alone.
+ */
+function watchCheckedOutConnections(
+  pool: NodePostgresPool,
+  onError: (error: unknown) => void,
+): void {
+  const watchedConnections = new WeakSet<PooledConnection>();
+  pool.on('acquire', (connection) => {
+    if (connection.listenerCount('error') > 1) {
+      return;
+    }
+    watchedConnections.add(connection);
+    connection.on('error', onError);
+  });
+  pool.on('release', (_error, connection) => {
+    if (watchedConnections.delete(connection)) {
+      connection.removeListener('error', onError);
+    }
+  });
 }
