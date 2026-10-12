@@ -38,6 +38,8 @@ function nodePostgresPoolLike() {
   const pool = Object.assign(new EventEmitter(), {
     end: vi.fn(),
     totalCount: 0,
+    idleCount: 0,
+    waitingCount: 0,
   });
   const idleListener = vi.fn();
   const connection = new EventEmitter();
@@ -153,17 +155,45 @@ describe('Drizzle - client errors', () => {
     );
   });
 
-  it('should stop listening on a pool connection once it is released', async () => {
+  it('should leave a released pool connection to pg-pool', async () => {
+    const error = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
     const { pool, connection, checkOut, release } = nodePostgresPoolLike();
     await boot({ db: { $client: pool } });
 
     checkOut();
+    release();
+    checkOut();
+    // Listened on once, however many times it's checked out.
     expect(connection.listenerCount('error')).toBe(1);
     release();
-    // pg-pool's idle listener only.
-    expect(connection.listenerCount('error')).toBe(1);
+    connection.emit('error', new Error('connection reset'));
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('should leave a pool connection alone when something listens on it after checkout', async () => {
+    const error = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    const { pool, connection, checkOut } = nodePostgresPoolLike();
+    await boot({ db: { $client: pool } });
+
     checkOut();
-    expect(connection.listenerCount('error')).toBe(1);
+    // e.g., `pool.query()`'s own listener, or the application's.
+    const onError = vi.fn();
+    connection.once('error', onError);
+    connection.emit('error', new Error('connection reset'));
+    expect(onError).toHaveBeenCalledOnce();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('should ignore an "acquire" event without an event emitter', async () => {
+    const { pool } = nodePostgresPoolLike();
+    await boot({ db: { $client: pool } });
+
+    expect(() => pool.emit('acquire', {})).not.toThrow();
+    expect(() => pool.emit('acquire')).not.toThrow();
   });
 
   it('should leave a pool connection alone when the application listens on it', async () => {
@@ -201,10 +231,12 @@ describe('Drizzle - client errors', () => {
     const error = vi
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);
-    const application = await boot({
-      drizzle: nodePostgres,
-      connection: POSTGRES_URL,
-    });
+    // The application listens on the pool, so the module doesn't: whatever it
+    // logs comes from the connection the transaction holds.
+    const pool = new Pool({ connectionString: POSTGRES_URL });
+    const poolError = vi.fn();
+    pool.on('error', poolError);
+    const application = await boot({ db: nodePostgres(pool) });
     const db = application.get(getDrizzleToken());
     const admin = new Client({ connectionString: POSTGRES_URL });
     await admin.connect();
@@ -225,6 +257,7 @@ describe('Drizzle - client errors', () => {
       'Database connection error',
       expect.stringContaining('terminat'),
     );
+    expect(pool.listenerCount('error')).toBe(1);
   });
 
   it('should listen on clients of primary and replica databases', async () => {
