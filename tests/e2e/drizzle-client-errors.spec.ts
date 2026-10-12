@@ -236,7 +236,7 @@ describe('Drizzle - client errors', () => {
     const pool = new Pool({ connectionString: POSTGRES_URL });
     const poolError = vi.fn();
     pool.on('error', poolError);
-    const application = await boot({ db: nodePostgres(pool) });
+    const application = await boot({ db: nodePostgres({ client: pool }) });
     const db = application.get(getDrizzleToken());
     const admin = new Client({ connectionString: POSTGRES_URL });
     await admin.connect();
