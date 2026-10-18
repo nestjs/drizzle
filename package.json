@@ -34,8 +34,8 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@commitlint/cli": "21.2.3",
-    "@commitlint/config-angular": "21.2.3",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-angular": "21.2.4",
     "@electric-sql/pglite": "0.5.9",
     "@libsql/client": "0.18.0",
     "@nestjs/common": "12.1.3",
