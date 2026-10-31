@@ -36,7 +36,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-angular": "21.2.4",
-    "@electric-sql/pglite": "0.5.11",
+    "@electric-sql/pglite": "0.5.14",
     "@libsql/client": "0.18.0",
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
