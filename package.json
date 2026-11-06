@@ -1,7 +1,20 @@
 {
   "name": "@nestjs/drizzle",
   "version": "0.0.2",
-  "description": "Nest - modern, fast, powerful node.js web framework (@drizzle)",
+  "description": "Drizzle ORM for NestJS: register the database once and inject it into your services, with PostgreSQL, MySQL, SQLite and serverless drivers.",
+  "keywords": [
+    "nestjs",
+    "nest",
+    "drizzle",
+    "drizzle-orm",
+    "orm",
+    "database",
+    "sql",
+    "postgres",
+    "postgresql",
+    "mysql",
+    "sqlite"
+  ],
   "author": "Kamil Mysliwiec",
   "license": "MIT",
   "url": "https://github.com/nestjs/drizzle#readme",
