@@ -3,7 +3,7 @@ import { INestApplicationContext, Logger, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { sql } from 'drizzle-orm';
 import { drizzle as nodePostgres } from 'drizzle-orm/node-postgres';
-import { Client, Pool } from 'pg';
+import { Client, Pool, type PoolClient } from 'pg';
 import {
   DrizzleModule,
   DrizzleModuleOptions,
@@ -236,13 +236,19 @@ describe('Drizzle - client errors', () => {
     const pool = new Pool({ connectionString: POSTGRES_URL });
     const poolError = vi.fn();
     pool.on('error', poolError);
+    let connection: PoolClient | undefined;
+    pool.on('acquire', (acquired) => {
+      connection = acquired;
+    });
     const application = await boot({ db: nodePostgres({ client: pool }) });
     const db = application.get(getDrizzleToken());
     const admin = new Client({ connectionString: POSTGRES_URL });
     await admin.connect();
+    let listeners = 0;
     try {
       await expect(
         db.transaction(async (tx: typeof db) => {
+          listeners = connection!.listenerCount('error');
           const { rows } = await tx.execute(
             sql`select pg_backend_pid() as pid`,
           );
@@ -253,10 +259,16 @@ describe('Drizzle - client errors', () => {
     } finally {
       await admin.end();
     }
-    expect(error).toHaveBeenCalledWith(
-      'Database connection error',
-      expect.stringContaining('terminat'),
-    );
+    // Drizzle 1's `transaction()` listens on its connection itself, so the
+    // module leaves the error to it. Earlier versions leave it to the module.
+    if (listeners === 1) {
+      expect(error).toHaveBeenCalledWith(
+        'Database connection error',
+        expect.stringContaining('terminat'),
+      );
+    } else {
+      expect(error).not.toHaveBeenCalled();
+    }
     expect(pool.listenerCount('error')).toBe(1);
   });
 
