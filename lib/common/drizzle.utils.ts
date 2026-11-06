@@ -150,10 +150,12 @@ function isNodePostgresPool(
  * else does. pg-pool listens on an idle connection itself, but removes that
  * listener when it hands the connection out, and puts it back on release. A
  * connection from `pool.connect()` therefore has no `error` listener while
- * it's in use, and Drizzle's `transaction()` runs on one: a connection the
- * server drops mid-transaction (a restart, a failover,
- * `pg_terminate_backend()`) emits `error` on an object nobody listens to, and
- * the process exits. Each connection gets one listener, the first time it's
+ * it's in use, and Drizzle's `transaction()` runs on one. Before Drizzle 1,
+ * whose `transaction()` listens itself, a connection the server drops
+ * mid-transaction (a restart, a failover, `pg_terminate_backend()`) emits
+ * `error` on an object nobody listens to, and the process exits. A connection
+ * the application takes from `pool.connect()` does so on every version. Each
+ * connection gets one listener, the first time it's
  * handed out, and keeps it. The listener only logs when it's the connection's
  * sole listener: an idle connection has pg-pool's, `pool.query()` adds its
  * own while the query runs, and the application may add one at any time, so
