@@ -62,7 +62,7 @@
     "husky": "9.1.7",
     "lint-staged": "17.6.0",
     "mysql2": "3.24.6",
-    "oxlint": "1.92.0",
+    "oxlint": "1.93.0",
     "pg": "8.23.1",
     "postgres": "4.1.0",
     "prettier": "3.9.10",
