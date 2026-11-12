@@ -65,7 +65,7 @@
     "oxlint": "1.93.0",
     "pg": "8.23.1",
     "postgres": "4.1.1",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "reflect-metadata": "0.2.2",
     "release-it": "21.1.2",
     "rxjs": "7.8.2",
