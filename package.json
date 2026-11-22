@@ -60,7 +60,7 @@
     "@types/supertest": "7.2.1",
     "drizzle-orm": "0.45.4",
     "husky": "9.1.7",
-    "lint-staged": "17.6.1",
+    "lint-staged": "17.6.2",
     "mysql2": "3.24.6",
     "oxlint": "1.94.0",
     "pg": "8.23.1",
